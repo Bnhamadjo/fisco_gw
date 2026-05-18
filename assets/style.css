@@ -1,0 +1,78 @@
+/* Premium CSS for FISCO_GW */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+:root {
+    --primary-color: #00d2ff;
+    --secondary-color: #3a7bd5;
+    --bg-dark: #0f172a;
+    --card-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+.stApp {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f8fafc;
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Glassmorphism Cards */
+div[data-testid="stMetricValue"] {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    color: var(--primary-color) !important;
+}
+
+div[data-testid="metric-container"] {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    padding: 20px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease;
+}
+
+div[data-testid="metric-container"]:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-color);
+}
+
+/* Sidebar Styling */
+section[data-testid="stSidebar"] {
+    background-color: rgba(15, 23, 42, 0.95) !important;
+    border-right: 1px solid var(--glass-border);
+}
+
+/* Custom Buttons */
+.stButton>button {
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+}
+
+.stButton>button:hover {
+    box-shadow: 0 0 20px rgba(0, 210, 255, 0.4) !important;
+    transform: scale(1.02);
+}
+
+/* Dataframe Styling */
+.stDataFrame {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Headers */
+h1, h2, h3 {
+    color: white !important;
+    letter-spacing: -0.5px;
+}
+
+.main-header {
+    background: linear-gradient(to right, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+}

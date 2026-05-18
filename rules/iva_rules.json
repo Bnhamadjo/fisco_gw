@@ -1,0 +1,11 @@
+{
+    "name": "IVA Rules",
+    "version": "1.0",
+    "regimes": {
+        "GERAL": 0.19,
+        "REDUZIDO": 0.05,
+        "ESPECIAL": 0.18,
+        "ISENTO": 0.0
+    },
+    "keywords": ["iva", "imposto", "liquidado", "suportado"]
+}
