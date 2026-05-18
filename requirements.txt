@@ -9,3 +9,4 @@ pdfplumber
 sqlalchemy
 psycopg2-binary
 scikit-learn
+xlsxwriter
