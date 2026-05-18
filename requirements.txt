@@ -5,3 +5,7 @@ numpy
 pyvis
 networkx
 openpyxl
+pdfplumber
+sqlalchemy
+psycopg2-binary
+scikit-learn
