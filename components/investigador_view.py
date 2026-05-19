@@ -116,6 +116,8 @@ def validar_e_adaptar_arquivo_fiscal(df: pd.DataFrame) -> Tuple[pd.DataFrame, Di
         # Converter data se existir
         if 'data' in df_renamed.columns:
             df_renamed['data'] = pd.to_datetime(df_renamed['data'], errors='coerce')
+            if df_renamed['data'].dt.tz is not None:
+                df_renamed['data'] = df_renamed['data'].dt.tz_localize(None)
         
         sucesso = adapter_info['campos_obrigatorios_ok']
         return df_renamed, adapter_info, sucesso
@@ -350,6 +352,8 @@ def investigador_inteligente(df: pd.DataFrame):
         # Filtro por data (se existir)
         if 'data' in df.columns:
             df['data'] = pd.to_datetime(df['data'], errors='coerce')
+            if df['data'].dt.tz is not None:
+                df['data'] = df['data'].dt.tz_localize(None)
             if not df['data'].isna().all():
                 min_date = df['data'].min().date()
                 max_date = df['data'].max().date()
@@ -706,6 +710,8 @@ def investigador_inteligente(df: pd.DataFrame):
                 # Preparar dados temporais
                 df_temporal = df_filtrado.copy()
                 df_temporal['data'] = pd.to_datetime(df_temporal['data'], errors='coerce')
+                if df_temporal['data'].dt.tz is not None:
+                    df_temporal['data'] = df_temporal['data'].dt.tz_localize(None)
                 df_temporal = df_temporal.dropna(subset=['data'])
                 
                 if not df_temporal.empty:

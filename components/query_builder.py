@@ -45,6 +45,8 @@ def query_builder(df):
                 date_col = st.selectbox("Filtrar por Data", ["Nenhum"] + date_cols)
                 if date_col != "Nenhum":
                     df_result[date_col] = pd.to_datetime(df_result[date_col], errors='coerce')
+                    if df_result[date_col].dt.tz is not None:
+                        df_result[date_col] = df_result[date_col].dt.tz_localize(None)
                     df_result = df_result.dropna(subset=[date_col])
                     if not df_result.empty:
                         min_date = df_result[date_col].min().date()

@@ -185,6 +185,8 @@ def analisar_contribuinte(df):
         for col in df_filtrado.columns:
             if "data" in col.lower():
                 dates = pd.to_datetime(df_filtrado[col], errors='coerce')
+                if dates.dt.tz is not None:
+                    dates = dates.dt.tz_localize(None)
                 future_dates = df_filtrado[dates > pd.Timestamp.now() + pd.Timedelta(days=1)]
                 if not future_dates.empty:
                     st.error(f"🚩 **Datas Futuras**: {len(future_dates)} faturas com datas no futuro.")
@@ -197,9 +199,13 @@ def analisar_contribuinte(df):
         if "data" in col:
 
             df[col] = pd.to_datetime(df[col], errors="coerce")
+            if df[col].dt.tz is not None:
+                df[col] = df[col].dt.tz_localize(None)
 
             temp = df_filtrado.copy()
             temp[col] = pd.to_datetime(temp[col], errors="coerce")
+            if temp[col].dt.tz is not None:
+                temp[col] = temp[col].dt.tz_localize(None)
             temp = temp.dropna(subset=[col])
             
             if not temp.empty:

@@ -26,6 +26,8 @@ def analise_temporal(df):
 
     # converter para datetime
     df[col_data] = pd.to_datetime(df[col_data], errors="coerce")
+    if df[col_data].dt.tz is not None:
+        df[col_data] = df[col_data].dt.tz_localize(None)
 
     # verificar coluna valor
     if "valor" not in df.columns:
