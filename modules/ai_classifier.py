@@ -5,7 +5,7 @@ TRAINING_DATA = {
     "IVA_ESPECIAL": ["hotel", "pousada", "resort", "restaurante", "bar", "cafe", "pasteleria", "alojamento"],
     "IVA_REDUZIDO": ["arroz", "leite", "pao", "farinha", "medicamento", "farmacia", "clinica", "hospital"],
     "ISENTA": ["ong", "associacao", "embaixada", "consulado", "estado", "ministerio"],
-    "RETENCAO": ["advogado", "consultor", "engenheiro", "medico", "servico profissional", "honorarios"],
+    "RETENCAO_SERVICOS": ["advogado", "consultor", "engenheiro", "medico", "servico profissional", "honorarios"],
     "IVA_NORMAL": ["lda", "sa", "su", "comercio", "servicos", "vendas", "import"]
 }
 

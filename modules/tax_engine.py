@@ -21,7 +21,9 @@ def calcular_imposto_inteligente(df):
             df['regime'] = "IVA_NORMAL"
             
     def get_tax(regime):
-        return REGRAS_FISCAIS.get(regime, REGRAS_FISCAIS["IVA_NORMAL"])["taxa"]
+        regime_data = REGRAS_FISCAIS.get(regime, REGRAS_FISCAIS["IVA_NORMAL"])
+        taxa = regime_data.get("taxa")
+        return float(taxa) if taxa is not None else float('nan')
         
     df['taxa_aplicada'] = df['regime'].apply(get_tax)
     df['imposto_calculado'] = df['valor'] * df['taxa_aplicada']
