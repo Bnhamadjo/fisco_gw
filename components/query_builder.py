@@ -99,9 +99,9 @@ def query_builder(df):
     if selected_cols:
         # Garantir que as colunas selecionadas existem no df filtrado (especialmente após transformações)
         cols_to_show = [c for c in selected_cols if c in df_result.columns]
-        st.dataframe(df_result[cols_to_show], use_container_width=True)
+        st.dataframe(df_result[cols_to_show], width='stretch')
     else:
-        st.dataframe(df_result, use_container_width=True)
+        st.dataframe(df_result, width='stretch')
 
     # Exportação
     if not df_result.empty:

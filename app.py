@@ -196,7 +196,7 @@ if pagina == "📊 Análise Fiscal":
         
         with col_left:
             if "cliente" in df_filtrado.columns and "valor" in df_filtrado.columns:
-                st.plotly_chart(grafico_clientes(df_filtrado), use_container_width=True)
+                st.plotly_chart(grafico_clientes(df_filtrado), width='stretch')
             else:
                 st.warning("⚠️ Colunas 'cliente' ou 'valor' não encontradas para o gráfico.")
         
@@ -223,14 +223,14 @@ if pagina == "📊 Análise Fiscal":
             st.caption("Filtra as 10 faturas com os montantes mais elevados. Estes registos representam o maior impacto financeiro potencial em caso de erro ou omissão.")
             suspeitos = top_suspeitos(df_filtrado)
             if suspeitos is not None:
-                st.dataframe(suspeitos, use_container_width=True)
+                st.dataframe(suspeitos, width='stretch')
 
         with col2:
             st.subheader("📉 Anomalias Estatísticas (Z-Score)")
             st.caption("Identifica valores que estão a mais de 3 desvios padrão da média. Matematicamente, estas transações são exceções raras e altamente suspeitas.")
             outliers = detect_statistical_outliers(df_filtrado)
             if outliers is not None:
-                st.dataframe(outliers, use_container_width=True)
+                st.dataframe(outliers, width='stretch')
 
         st.divider()
         
@@ -238,7 +238,7 @@ if pagina == "📊 Análise Fiscal":
         st.caption("Compara a frequência do primeiro dígito dos valores com a distribuição natural esperada. Desvios na curva sugerem que os dados podem não ter sido gerados organicamente.")
         fig_benford, mae = benford_analysis(df_filtrado)
         if fig_benford:
-            st.plotly_chart(fig_benford, use_container_width=True)
+            st.plotly_chart(fig_benford, width='stretch')
             st.info(f"**Desvio Médio Absoluto (MAE):** {mae:.4f}")
             if mae > 0.05:
                 st.warning("⚠️ O desvio da Lei de Benford é elevado, sugerindo possível manipulação de dados.")
@@ -251,14 +251,14 @@ if pagina == "📊 Análise Fiscal":
             st.caption("Lista registos com valores negativos ou zero. Estas entradas anulam a base tributável e podem indicar erros graves de processamento.")
             invalidos = detectar_valores_invalidos(df_filtrado)
             if invalidos is not None:
-                st.dataframe(invalidos, use_container_width=True)
+                st.dataframe(invalidos, width='stretch')
 
         with col4:
             st.subheader("🔄 Transações Duplicadas Suspeitas")
             st.caption("Procura por faturas idênticas (mesmo cliente, fornecedor e valor). Pode sinalizar faturamento duplo para inflar custos ou erros de importação.")
             duplicados = find_duplicate_transactions(df_filtrado)
             if duplicados is not None:
-                st.dataframe(duplicados, use_container_width=True)
+                st.dataframe(duplicados, width='stretch')
 
         st.divider()
         
@@ -270,8 +270,8 @@ if pagina == "📊 Análise Fiscal":
         st.caption("Pontuação acumulada baseada em volume financeiro (40pts), frequência atípica (30pts) e desvios estatísticos. Quanto maior o score, maior a prioridade de fiscalização.")
         risk_df = calcular_score_risco(df_filtrado)
         if risk_df is not None:
-            st.dataframe(risk_df, use_container_width=True)
-            st.plotly_chart(grafico_risco(risk_df), use_container_width=True)
+            st.dataframe(risk_df, width='stretch')
+            st.plotly_chart(grafico_risco(risk_df), width='stretch')
 
     # DADOS
     with abas[2]:

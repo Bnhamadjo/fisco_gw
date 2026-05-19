@@ -117,7 +117,7 @@ def download_buttons(df, filename="relatorio", key_prefix=""):
             data=exportar_csv(df),
             file_name=f"{filename}.csv",
             mime='text/csv',
-            use_container_width=True,
+            width='stretch',
             key=f"{key_prefix}_csv"
         )
         
@@ -129,7 +129,7 @@ def download_buttons(df, filename="relatorio", key_prefix=""):
                 data=excel_data,
                 file_name=f"{filename}.xlsx",
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                use_container_width=True,
+                width='stretch',
                 key=f"{key_prefix}_excel"
             )
         except Exception as e:
@@ -146,7 +146,7 @@ def download_buttons(df, filename="relatorio", key_prefix=""):
                     data=pdf_data,
                     file_name=f"{filename}.pdf",
                     mime='application/pdf',
-                    use_container_width=True,
+                    width='stretch',
                     key=f"{key_prefix}_pdf_down"
                 )
             else:

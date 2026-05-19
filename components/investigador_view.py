@@ -261,7 +261,7 @@ def investigador_inteligente(df: pd.DataFrame):
         st.divider()
         
         # Botões de ação
-        if st.button("🔄 Resetar Filtros", use_container_width=True):
+        if st.button("🔄 Resetar Filtros", width='stretch'):
             st.rerun()
     
     # Métricas rápidas
@@ -338,7 +338,7 @@ def investigador_inteligente(df: pd.DataFrame):
             ]
             
             st.subheader("📋 Histórico de Transações")
-            st.dataframe(transacoes_entidade, use_container_width=True)
+            st.dataframe(transacoes_entidade, width='stretch')
     
     # TAB 2: ANÁLISE DE FLUXOS
     with tab_col:
@@ -357,7 +357,7 @@ def investigador_inteligente(df: pd.DataFrame):
                             labels={'valor': 'Volume (FCFA)', 'cliente': 'Cliente'},
                             text_auto='.2s')
                 fig.update_layout(showlegend=True, height=500)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
                 # Heatmap das principais relações
                 st.subheader("🗺️ Mapa de Calor de Transações")
@@ -385,7 +385,7 @@ def investigador_inteligente(df: pd.DataFrame):
                                         aspect="auto",
                                         color_continuous_scale="Viridis")
                     fig_heat.update_layout(height=600)
-                    st.plotly_chart(fig_heat, use_container_width=True)
+                    st.plotly_chart(fig_heat, width='stretch')
             else:
                 st.info("Nenhum dado de fluxo disponível")
     
@@ -502,12 +502,12 @@ def investigador_inteligente(df: pd.DataFrame):
                                 st.warning(f"Foram encontradas **{len(evidencias)}** faturas com divergência entre {ent_a} e {ent_b}.")
                                 cols_ev = ['fatura', 'data', 'valor', 'Imposto Declarado', 'Imposto Real (Calculado)', 'Diferença (Risco)']
                                 cols_ev_exists = [c for c in cols_ev if c in evidencias.columns]
-                                st.dataframe(evidencias[cols_ev_exists].sort_values(by='Diferença (Risco)', ascending=False), use_container_width=True)
+                                st.dataframe(evidencias[cols_ev_exists].sort_values(by='Diferença (Risco)', ascending=False), width='stretch')
                             else:
                                 st.success("✅ Nenhuma discrepância fiscal detectada nas transações mutuais.")
                                 
                     st.write("#### Todas as Transações do Par")
-                    st.dataframe(todas_transacoes, use_container_width=True)
+                    st.dataframe(todas_transacoes, width='stretch')
                 else:
                     st.info(f"📭 Nenhuma transação direta entre {ent_a} e {ent_b}")
             else:
@@ -520,7 +520,7 @@ def investigador_inteligente(df: pd.DataFrame):
         st.subheader("🚨 Sistema de Detecção de Anomalias")
         st.caption("Aplica algoritmos de Z-Score e IQR (Amplitude Interquartil) para isolar transações que fogem radicalmente do padrão do grupo analisado. Foca na deteção de erros de digitação ou fraudes de alto valor.")
         
-        if st.button("🔍 Executar Análise de Anomalias", use_container_width=True):
+        if st.button("🔍 Executar Análise de Anomalias", width='stretch'):
             with st.spinner("Analisando transações..."):
                 anomalias = detectar_anomalias_avancado(df_filtrado)
                 
@@ -549,7 +549,7 @@ def investigador_inteligente(df: pd.DataFrame):
                     cols_mostrar = ['cliente', 'fornecedor', 'valor', 'z_score', 'nivel_risco']
                     cols_existentes = [c for c in cols_mostrar if c in anomalias.columns]
                     st.dataframe(anomalias[cols_existentes].sort_values('z_score', ascending=False), 
-                               use_container_width=True)
+                               width='stretch')
                 else:
                     st.success("✅ Nenhuma anomalia significativa detectada!")
     
@@ -576,7 +576,7 @@ def investigador_inteligente(df: pd.DataFrame):
                                   title="Evolução do Volume de Transações",
                                   markers=True)
                 fig_line.update_layout(height=400)
-                st.plotly_chart(fig_line, use_container_width=True)
+                st.plotly_chart(fig_line, width='stretch')
                 
                 # Sazonalidade
                 df_temporal['mês_num'] = df_temporal['data'].dt.month
@@ -585,7 +585,7 @@ def investigador_inteligente(df: pd.DataFrame):
                 fig_sazonal = px.bar(sazonal, x='mês_num', y='valor',
                                     title="Média por Mês (Sazonalidade)",
                                     labels={'mês_num': 'Mês', 'valor': 'Média (FCFA)'})
-                st.plotly_chart(fig_sazonal, use_container_width=True)
+                st.plotly_chart(fig_sazonal, width='stretch')
             else:
                 st.info("Dados de data inválidos ou insuficientes")
         else:
@@ -602,7 +602,7 @@ def investigador_inteligente(df: pd.DataFrame):
             st.markdown("### 🤖 Motor Preditivo (Mutações Comportamentais)")
             st.info("A IA analisa o comportamento financeiro multidimensional e isola contribuintes cujo padrão destoa agressivamente da 'normalidade' do grupo.")
             
-            if st.button("Executar Modelo de Isolation Forest", use_container_width=True):
+            if st.button("Executar Modelo de Isolation Forest", width='stretch'):
                 with st.spinner("Treinando modelo de IA com os dados em memória..."):
                     from modules.ml_engine import prever_anomalias_ml
                     anomalias_ia = prever_anomalias_ml(df_filtrado)
@@ -610,7 +610,7 @@ def investigador_inteligente(df: pd.DataFrame):
                     if not anomalias_ia.empty:
                         st.error(f"🚨 A IA identificou **{len(anomalias_ia)}** entidades com perfil altamente suspeito!")
                         # Exibir as colunas com formatação condicional de cor
-                        st.dataframe(anomalias_ia.style.background_gradient(subset=['indice_suspeita_ia'], cmap='Reds'), use_container_width=True)
+                        st.dataframe(anomalias_ia.style.background_gradient(subset=['indice_suspeita_ia'], cmap='Reds'), width='stretch')
                     else:
                         st.success("✅ A IA não encontrou nenhum padrão anómalo escondido.")
                         
@@ -618,7 +618,7 @@ def investigador_inteligente(df: pd.DataFrame):
             st.markdown("### 🕸️ Ciber-Forense (Fraude Carrossel)")
             st.info("Varre a rede de transações em busca de 'Ciclos Fechados' (Ex: A vende a B, que vende a C, que vende a A), a técnica mais comum para evasão massiva de IVA.")
             
-            if st.button("Executar Varredura de Redes Complexas", use_container_width=True):
+            if st.button("Executar Varredura de Redes Complexas", width='stretch'):
                 with st.spinner("Mapeando direções do dinheiro (Teoria dos Grafos)..."):
                     from modules.network import detetar_fraude_carrossel
                     ciclos = detetar_fraude_carrossel(df_filtrado)
@@ -636,14 +636,14 @@ def investigador_inteligente(df: pd.DataFrame):
         st.markdown("### ⏳ Inteligência Comportamental (Sinais de Lavagem)")
         st.info("Analisa a série histórica de cada contribuinte. Picos súbitos e massivos de faturamento (5x a média) que ignoram a sazonalidade normal podem ser indicativos de injeção de capital ilícito (Lavagem de Dinheiro).")
         
-        if st.button("Executar Scan Comportamental", use_container_width=True):
+        if st.button("Executar Scan Comportamental", width='stretch')::
             with st.spinner("Analisando perfil temporal de todos os contribuintes..."):
                 from modules.fraud import detectar_lavagem_temporal
                 picos = detectar_lavagem_temporal(df_filtrado)
                 
                 if not picos.empty:
                     st.error(f"🚨 Detetadas **{len(picos)}** entidades com picos de faturamento anormais e extremos.")
-                    st.dataframe(picos, use_container_width=True)
+                    st.dataframe(picos, width='stretch')
                 else:
                     st.success("✅ O perfil temporal dos contribuintes analisados não apresenta picos de lavagem estruturados.")
 
