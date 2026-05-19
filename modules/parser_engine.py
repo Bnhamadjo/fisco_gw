@@ -1,5 +1,5 @@
 from modules.schema_detector import detectar_tipo_declaracao
-from modules.cleaner import normalize_columns
+from modules.cleaner import normalize_columns, clean_for_arrow
 from modules.tax_engine import calcular_imposto_inteligente
 from modules.field_adapter import create_field_adapter
 
@@ -22,6 +22,9 @@ def interpretar_ficheiro_inteligente(df):
     
     # 4. Adaptar dataframe (renomear campos detectados)
     df = adapter.adapt_dataframe()
+    
+    # 4.5. Higienizar tipos e fusos horários para compatibilidade total com o PyArrow do Streamlit Cloud
+    df = clean_for_arrow(df)
     
     # Adicionar metadados
     df['tipo_declaracao'] = tipo

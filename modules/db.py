@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import streamlit as st
 import os
 import logging
@@ -22,7 +22,7 @@ def get_engine():
         engine = create_engine(DATABASE_URL, echo=False)
         # Test connection
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         logger.info("✓ PostgreSQL conectado com sucesso")
         return engine
     except Exception as e:
@@ -34,7 +34,7 @@ def get_engine():
             sqlite_url = "sqlite:///fiscal_db.db"
             engine = create_engine(sqlite_url, echo=False)
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             logger.info("✓ SQLite (fallback) conectado com sucesso")
             return engine
         except Exception as e_sqlite:
