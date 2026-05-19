@@ -69,6 +69,79 @@ def cache_dataframe(df: pd.DataFrame, operation: str) -> pd.DataFrame:
     """Cache operations for better performance"""
     return df.copy()
 
+def validar_e_adaptar_arquivo_fiscal(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, str], bool, List[str], Dict[str, str]]:
+    """
+    Valida e adapta arquivo fiscal de entrada.
+    
+    Retorna:
+    - df_adaptado: DataFrame com colunas remapeadas
+    - mapping: Dicionário com mapeamentos aplicados (campo_padrão -> coluna_original)
+    - sucesso: True se validação passou, False caso contrário
+    - colunas_faltando: Lista de colunas obrigatórias não encontradas
+    - campos_opcionais_mapeados: Dicionário de campos opcionais encontrados
+    """
+    from modules.field_adapter import FieldAdapter
+    
+    # Campos obrigatórios para o investigador
+    CAMPOS_OBRIGATORIOS = ['cliente', 'fornecedor', 'valor']
+    CAMPOS_OPCIONAIS = ['fatura', 'data', 'iva_liquidado', 'iva_suportado', 'nif_cliente', 'nif_fornecedor']
+    
+    # Nomes alternativos para cada campo
+    MAPA_ALTERNATIVAS = {
+        'cliente': ['nome do declarante', 'nome cliente', 'cliente name', 'comprador', 'vendedor'],
+        'fornecedor': ['nome do fornecedor', 'fornecedor name', 'prestador', 'fornecedor'],
+        'valor': ['base tributavel', 'valor total', 'total base', 'valor sem iva', 'montante', 'montante liquido'],
+        'fatura': ['numero de fatura', 'numero fatura', 'fatura numero', 'fatura n', 'invoice'],
+        'data': ['data da fatura', 'data da factura', 'data de emissao', 'data emissao', 'invoice date'],
+        'iva_liquidado': ['iva liquidado', 'iva credito', 'iva'],
+        'iva_suportado': ['iva suportado', 'iva dedutivel', 'iva debito'],
+        'nif_cliente': ['nif do declarante', 'nif cliente', 'nif do cliente', 'nif comprador'],
+        'nif_fornecedor': ['nif do fornecedor', 'nif fornecedor', 'nif prestador'],
+    }
+    
+    df_work = df.copy()
+    mapping = {}
+    colunas_faltando = []
+    
+    # Normalizar nomes de colunas para lowercase
+    df_work.columns = df_work.columns.str.lower().str.strip()
+    colunas_disponiveis = list(df_work.columns)
+    
+    # Tentar mapear cada campo obrigatório
+    for campo in CAMPOS_OBRIGATORIOS:
+        if campo in colunas_disponiveis:
+            mapping[campo] = campo
+        else:
+            # Procurar alternativa por correspondência fuzzy
+            encontrado = False
+            for alt in MAPA_ALTERNATIVAS.get(campo, []):
+                alt_lower = alt.lower().strip()
+                if alt_lower in colunas_disponiveis:
+                    mapping[campo] = alt_lower
+                    df_work.rename(columns={alt_lower: campo}, inplace=True)
+                    encontrado = True
+                    break
+            
+            if not encontrado:
+                colunas_faltando.append(campo)
+    
+    # Tentar mapear campos opcionais
+    campos_opcionais_mapeados = {}
+    for campo in CAMPOS_OPCIONAIS:
+        if campo in colunas_disponiveis:
+            campos_opcionais_mapeados[campo] = campo
+        else:
+            for alt in MAPA_ALTERNATIVAS.get(campo, []):
+                alt_lower = alt.lower().strip()
+                if alt_lower in colunas_disponiveis:
+                    campos_opcionais_mapeados[campo] = alt_lower
+                    df_work.rename(columns={alt_lower: campo}, inplace=True)
+                    break
+    
+    # Retornar status
+    sucesso = len(colunas_faltando) == 0
+    return df_work, mapping, sucesso, colunas_faltando, campos_opcionais_mapeados
+
 def limpar_dados_entidade(df: pd.DataFrame, coluna: str) -> pd.Series:
     """Limpa e padroniza dados de entidades"""
     if coluna not in df.columns:
@@ -193,6 +266,34 @@ def investigador_inteligente(df: pd.DataFrame):
         st.warning("⚠️ Nenhum dado carregado. Por favor, carregue um arquivo para iniciar a investigação.")
         return
     
+    # ========== VALIDAÇÃO E ADAPTAÇÃO DO ARQUIVO ==========
+    st.subheader("📋 Validação do Arquivo Fiscal")
+    
+    df, mapping, sucesso, colunas_faltando, campos_opcionais = validar_e_adaptar_arquivo_fiscal(df)
+    
+    # Mostrar resultado da validação
+    col_val1, col_val2 = st.columns(2)
+    
+    with col_val1:
+        if sucesso:
+            st.success("✅ Arquivo validado com sucesso!")
+            st.caption(f"Colunas obrigatórias encontradas e mapeadas: {', '.join(list(mapping.keys()))}")
+        else:
+            st.error(f"❌ Erro na validação: Colunas obrigatórias faltando")
+            st.error(f"Campos não encontrados: {', '.join(colunas_faltando)}")
+            st.info("📋 O arquivo DEVE conter as colunas:\n- **cliente** (nome do comprador/declarante)\n- **fornecedor** (nome do vendedor/prestador)\n- **valor** (montante/base tributável)")
+            st.info("📌 Campos opcionais recomendados:\n- fatura (número de NF/fatura)\n- data (data da transação)\n- iva_liquidado (imposto liquidado)\n- iva_suportado (imposto suportado)\n- nif_cliente, nif_fornecedor")
+            return
+    
+    with col_val2:
+        if campos_opcionais:
+            opt_list = ", ".join(campos_opcionais.keys())
+            st.info(f"✨ Campos opcionais detectados: {opt_list}")
+        else:
+            st.caption("ℹ️ Sem campos opcionais. Algumas análises terão funcionalidade limitada.")
+    
+    st.divider()
+    
     # Limpeza inicial dos dados
     # Converter colunas de texto para string e tratar nulos
     for col in ['cliente', 'fornecedor']:
@@ -203,15 +304,6 @@ def investigador_inteligente(df: pd.DataFrame):
     # Converter valor para numérico
     if 'valor' in df.columns:
         df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0)
-    
-    # Verificar colunas essenciais
-    colunas_essenciais = ['cliente', 'fornecedor', 'valor']
-    colunas_faltando = [col for col in colunas_essenciais if col not in df.columns]
-    
-    if colunas_faltando:
-        st.error(f"❌ Colunas obrigatórias não encontradas: {', '.join(colunas_faltando)}")
-        st.info("📋 O arquivo deve conter as colunas: cliente, fornecedor, valor (e opcionalmente: fatura, data, iva_liquidado, etc.)")
-        return
     
     # Sidebar com controles
     with st.sidebar:
