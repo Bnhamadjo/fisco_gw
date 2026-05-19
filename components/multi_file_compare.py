@@ -191,13 +191,13 @@ def multi_file_compare(dfs, file_names):
     col_f1, col_f2 = st.columns(2)
     with col_f1:
         if 'cliente' in all_df.columns:
-            clientes_disponiveis = ["Todos"] + sorted(all_df['cliente'].dropna().unique().tolist())
+            clientes_disponiveis = ["Todos"] + sorted(all_df['cliente'].dropna().astype(str).unique().tolist())
             sel_cliente = st.selectbox("Filtrar por Cliente", clientes_disponiveis, key="multi_cli")
         else:
             sel_cliente = "Todos"
     with col_f2:
         if 'fornecedor' in all_df.columns:
-            fornecedores_disponiveis = ["Todos"] + sorted(all_df['fornecedor'].dropna().unique().tolist())
+            fornecedores_disponiveis = ["Todos"] + sorted(all_df['fornecedor'].dropna().astype(str).unique().tolist())
             sel_fornecedor = st.selectbox("Filtrar por Fornecedor", fornecedores_disponiveis, key="multi_forn")
         else:
             sel_fornecedor = "Todos"
