@@ -72,9 +72,62 @@ class FieldAdapter:
         s = re.sub(r'[^a-z0-9\s]', ' ', s)
         return ' '.join(s.split())
     
+    def _profile_column(self, original_col: str) -> Dict[str, float]:
+        """Extrai características do conteúdo da coluna para mapeamento inteligente."""
+        serie = self.df[original_col].dropna().astype(str).str.strip()
+        if serie.empty:
+            return {
+                "numeric_ratio": 0.0,
+                "alpha_ratio": 0.0,
+                "has_nif_like": 0.0,
+            }
+
+        numeric_ratio = serie.str.fullmatch(r"\d+").mean()
+        alpha_ratio = serie.str.contains(r"[A-Za-z]", regex=True).mean()
+        has_nif_like = serie.str.fullmatch(r"\d{7,15}").mean()
+
+        return {
+            "numeric_ratio": float(numeric_ratio),
+            "alpha_ratio": float(alpha_ratio),
+            "has_nif_like": float(has_nif_like),
+        }
+    
+    def _adjust_score_for_field(self, field_name: str, col: str, profile: Dict[str, float], score: float) -> float:
+        """Ajusta a pontuação de correspondência usando heurísticas de conteúdo."""
+        if field_name in ["cliente", "fornecedor"]:
+            if profile["numeric_ratio"] > 0.7:
+                score -= 50
+            if profile["alpha_ratio"] > 0.5:
+                score += 10
+            if "nif" in col:
+                score -= 40
+            if "nome" in col or "empresa" in col or "entidade" in col:
+                score += 10
+
+        if field_name in ["nif_cliente", "nif_fornecedor"]:
+            if profile["numeric_ratio"] > 0.6:
+                score += 15
+            if profile["has_nif_like"] > 0.5:
+                score += 15
+            if profile["alpha_ratio"] > 0.5:
+                score -= 50
+            if "nome" in col:
+                score -= 40
+            if "nif" in col:
+                score += 15
+
+        if field_name == "valor":
+            if profile["numeric_ratio"] > 0.8:
+                score += 10
+            if profile["alpha_ratio"] > 0.5:
+                score -= 30
+
+        return score
+    
     def _detect_fields(self):
         """Detecta campos disponíveis com fuzzy matching"""
         available_cols = [self._clean_string(col) for col in self.original_columns]
+        column_profiles = {col: self._profile_column(col) for col in self.original_columns}
         used_indices = set()
         
         # Para cada campo esperado, encontrar melhor match
@@ -100,6 +153,9 @@ class FieldAdapter:
                     else:
                         ratio = difflib.SequenceMatcher(None, clean_kw, col).ratio()
                         score = ratio * 70
+
+                    profile = column_profiles[self.original_columns[idx]]
+                    score = self._adjust_score_for_field(field_name, col, profile, score)
                     
                     if score > best_score and score > 60:
                         best_score = score
