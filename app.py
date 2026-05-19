@@ -88,6 +88,7 @@ uploaded_files = st.file_uploader(
 )
 
 dfs = []
+file_names = []
 df = None
 
 # =========================
@@ -112,7 +113,9 @@ if uploaded_files:
                     if 'adapters' not in st.session_state:
                         st.session_state.adapters = []
                     st.session_state.adapters.append(adapter)
+                    df_temp['origem_ficheiro'] = f"{file.name} ({sheet})"
                     dfs.append(df_temp)
+                    file_names.append(f"{file.name} ({sheet})")
         else:
             df_temp = load_file(file)
             if df_temp is not None:
@@ -122,10 +125,33 @@ if uploaded_files:
                 if 'adapters' not in st.session_state:
                     st.session_state.adapters = []
                 st.session_state.adapters.append(adapter)
+                df_temp['origem_ficheiro'] = file.name
                 dfs.append(df_temp)
+                file_names.append(file.name)
 
     if dfs:
-        df = dfs[0]
+        # Opção para analisar consolidado ou individual
+        st.sidebar.divider()
+        st.sidebar.subheader("🎯 Seleção de Dados")
+        
+        modo_analise = st.sidebar.radio(
+            "Modo de Análise",
+            ["Individual (Selecionar)", "Consolidado (Todos os Anexos)"] if len(dfs) > 1 else ["Individual (Selecionar)"]
+        )
+        
+        if modo_analise == "Consolidado (Todos os Anexos)":
+            df = pd.concat(dfs, ignore_index=True)
+            st.sidebar.success(f"🔗 **{len(dfs)}** anexos consolidados!")
+        else:
+            if len(dfs) > 1:
+                selected_idx = st.sidebar.selectbox(
+                    "Ficheiro Ativo",
+                    range(len(dfs)),
+                    format_func=lambda idx: file_names[idx]
+                )
+                df = dfs[selected_idx]
+            else:
+                df = dfs[0]
 
         # Opção para inverter papéis caso o mapeamento automático tenha trocado
         st.sidebar.divider()
@@ -183,7 +209,7 @@ if pagina == "📊 Análise Fiscal":
                     st.markdown(f"\n⚠️ **Campos não detectados:** {', '.join(missing_important)}")
                     st.markdown("*O sistema funcionará com análises adaptadas*")
 
-    abas = st.tabs([
+    tab_titles = [
         "📊 Dashboard",
         "🔎 Auditoria",
         "📂 Dados",
@@ -191,7 +217,11 @@ if pagina == "📊 Análise Fiscal":
         "🔍 Explorar",
         "👤 Contribuinte / Relação",
         "📅 Análise Temporal"
-    ])
+    ]
+    if len(dfs) >= 2:
+        tab_titles.append("⚖️ Comparação Multi-Ficheiro")
+        
+    abas = st.tabs(tab_titles)
 
     # DASHBOARD
     with abas[0]:
@@ -346,21 +376,11 @@ if pagina == "📊 Análise Fiscal":
 
         cruzamento_fiscal(df_filtrado)
 
-    # COMPARAÇÃO
+    # COMPARAÇÃO MULTI-FICHEIRO
     if len(dfs) >= 2:
-        df1, df2 = dfs[:2]
-        colunas = list(set(df1.columns) & set(df2.columns))
-
-        if len(colunas) >= 2:
-            st.subheader("🔍 Comparação")
-            # Garantir que as colunas de merge tenham o mesmo tipo para evitar erro de 'object' vs 'float'
-            df1_comp = df1.copy()
-            df2_comp = df2.copy()
-            for col in colunas:
-                df1_comp[col] = df1_comp[col].astype(str)
-                df2_comp[col] = df2_comp[col].astype(str)
-                
-            st.dataframe(df1_comp.merge(df2_comp, on=colunas, how="outer").head())
+        with abas[7]:
+            from components.multi_file_compare import multi_file_compare
+            multi_file_compare(dfs, file_names)
 
     st.divider()
     st.subheader("📥 Exportar Resultados")
