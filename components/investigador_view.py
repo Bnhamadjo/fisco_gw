@@ -610,7 +610,12 @@ def investigador_inteligente(df: pd.DataFrame):
                     if not anomalias_ia.empty:
                         st.error(f"🚨 A IA identificou **{len(anomalias_ia)}** entidades com perfil altamente suspeito!")
                         # Exibir as colunas com formatação condicional de cor
-                        st.dataframe(anomalias_ia.style.background_gradient(subset=['indice_suspeita_ia'], cmap='Reds'), width='stretch')
+                        try:
+                            import matplotlib
+                            st.dataframe(anomalias_ia.style.background_gradient(subset=['indice_suspeita_ia'], cmap='Reds'), width='stretch')
+                        except ImportError:
+                            st.warning("Biblioteca matplotlib não disponível. Exibindo tabela sem estilo.")
+                            st.dataframe(anomalias_ia, width='stretch')
                     else:
                         st.success("✅ A IA não encontrou nenhum padrão anómalo escondido.")
                         
