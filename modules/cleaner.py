@@ -111,10 +111,8 @@ def normalize_columns(df):
     # 8. PREVENÇÃO DE ERROS DO PYARROW (Garantir que colunas com texto sejam string pura e não tipo misto object)
     for col in df.columns:
         if df[col].dtype == 'object':
-            # Se a coluna contém strings, converte para string pura para o Arrow não engasgar
-            has_str = df[col].apply(lambda x: isinstance(x, str)).any()
-            if has_str:
-                df[col] = df[col].fillna('').astype(str).str.strip()
+            df[col] = df[col].fillna('').astype(str).str.strip()
+            df[col] = df[col].replace({'nan': '', 'None': '', '<NA>': ''})
 
     return df
 
@@ -129,10 +127,8 @@ def clean_for_arrow(df):
     # 1. PREVENÇÃO DE ERROS DO PYARROW (Garantir que colunas com texto sejam string pura e não tipo misto object)
     for col in df.columns:
         if df[col].dtype == 'object':
-            # Se a coluna contém strings, converte para string pura para o Arrow não engasgar
-            has_str = df[col].apply(lambda x: isinstance(x, str)).any()
-            if has_str:
-                df[col] = df[col].fillna('').astype(str).str.strip()
+            df[col] = df[col].fillna('').astype(str).str.strip()
+            df[col] = df[col].replace({'nan': '', 'None': '', '<NA>': ''})
 
     # 2. NORMALIZAÇÃO DE TIMEZONES (Evitar erros de comparação datetime64[us, UTC] com Timestamp)
     for col in df.columns:
