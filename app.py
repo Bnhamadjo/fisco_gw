@@ -107,15 +107,21 @@ if uploaded_files:
             for sheet in selected_sheets:
                 df_temp = load_file(file, sheet_name=sheet)
                 if df_temp is not None:
-                    df_temp, tipo = interpretar_ficheiro_inteligente(df_temp)
+                    df_temp, tipo, adapter = interpretar_ficheiro_inteligente(df_temp)
                     st.sidebar.success(f"✅ {sheet}: **{tipo}**")
+                    if 'adapters' not in st.session_state:
+                        st.session_state.adapters = []
+                    st.session_state.adapters.append(adapter)
                     dfs.append(df_temp)
         else:
             df_temp = load_file(file)
             if df_temp is not None:
                 # Motor Inteligente
-                df_temp, tipo = interpretar_ficheiro_inteligente(df_temp)
+                df_temp, tipo, adapter = interpretar_ficheiro_inteligente(df_temp)
                 st.sidebar.info(f"📂 {file.name}\n📋 Tipo: **{tipo}**")
+                if 'adapters' not in st.session_state:
+                    st.session_state.adapters = []
+                st.session_state.adapters.append(adapter)
                 dfs.append(df_temp)
 
     if dfs:
@@ -156,6 +162,26 @@ if pagina == "📊 Análise Fiscal":
     st.success("✅ Dados carregados com sucesso.")
 
     df_filtrado = aplicar_filtros(df)
+    
+    # Diagnóstico de Campos - Mostrar só se houver adapter disponível
+    if 'adapters' in st.session_state and st.session_state.adapters:
+        adapter = st.session_state.adapters[0]  # Usar o primeiro adaptador
+        with st.expander("🔍 **Diagnóstico Automático de Campos**", expanded=False):
+            col_diag1, col_diag2 = st.columns(2)
+            
+            with col_diag1:
+                st.markdown(adapter.get_summary())
+            
+            with col_diag2:
+                st.markdown("📋 **Análises Recomendadas:**")
+                st.markdown(adapter.get_analysis_recommendation())
+                
+                # Mostrar informações dos campos não detectados
+                missing_important = [f for f in ["cliente", "fornecedor", "data", "iva_suportado", "iva_liquidado"] 
+                                    if f not in adapter.available_fields]
+                if missing_important:
+                    st.markdown(f"\n⚠️ **Campos não detectados:** {', '.join(missing_important)}")
+                    st.markdown("*O sistema funcionará com análises adaptadas*")
 
     abas = st.tabs([
         "📊 Dashboard",
