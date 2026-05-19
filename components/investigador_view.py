@@ -69,78 +69,60 @@ def cache_dataframe(df: pd.DataFrame, operation: str) -> pd.DataFrame:
     """Cache operations for better performance"""
     return df.copy()
 
-def validar_e_adaptar_arquivo_fiscal(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, str], bool, List[str], Dict[str, str]]:
+def validar_e_adaptar_arquivo_fiscal(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict, bool]:
     """
-    Valida e adapta arquivo fiscal de entrada.
+    Adaptação TOTAL do arquivo fiscal - funciona com QUALQUER estrutura.
     
     Retorna:
-    - df_adaptado: DataFrame com colunas remapeadas
-    - mapping: Dicionário com mapeamentos aplicados (campo_padrão -> coluna_original)
-    - sucesso: True se validação passou, False caso contrário
-    - colunas_faltando: Lista de colunas obrigatórias não encontradas
-    - campos_opcionais_mapeados: Dicionário de campos opcionais encontrados
+    - df_adaptado: DataFrame com colunas reconhecidas
+    - adapter_info: Dicionário com informações do FieldAdapter
+    - sucesso: True se conseguiu mapear pelo menos cliente+fornecedor+valor
     """
     from modules.field_adapter import FieldAdapter
     
-    # Campos obrigatórios para o investigador
-    CAMPOS_OBRIGATORIOS = ['cliente', 'fornecedor', 'valor']
-    CAMPOS_OPCIONAIS = ['fatura', 'data', 'iva_liquidado', 'iva_suportado', 'nif_cliente', 'nif_fornecedor']
-    
-    # Nomes alternativos para cada campo
-    MAPA_ALTERNATIVAS = {
-        'cliente': ['nome do declarante', 'nome cliente', 'cliente name', 'comprador', 'vendedor'],
-        'fornecedor': ['nome do fornecedor', 'fornecedor name', 'prestador', 'fornecedor'],
-        'valor': ['base tributavel', 'valor total', 'total base', 'valor sem iva', 'montante', 'montante liquido'],
-        'fatura': ['numero de fatura', 'numero fatura', 'fatura numero', 'fatura n', 'invoice'],
-        'data': ['data da fatura', 'data da factura', 'data de emissao', 'data emissao', 'invoice date'],
-        'iva_liquidado': ['iva liquidado', 'iva credito', 'iva'],
-        'iva_suportado': ['iva suportado', 'iva dedutivel', 'iva debito'],
-        'nif_cliente': ['nif do declarante', 'nif cliente', 'nif do cliente', 'nif comprador'],
-        'nif_fornecedor': ['nif do fornecedor', 'nif fornecedor', 'nif prestador'],
-    }
-    
-    df_work = df.copy()
-    mapping = {}
-    colunas_faltando = []
-    
-    # Normalizar nomes de colunas para lowercase
-    df_work.columns = df_work.columns.str.lower().str.strip()
-    colunas_disponiveis = list(df_work.columns)
-    
-    # Tentar mapear cada campo obrigatório
-    for campo in CAMPOS_OBRIGATORIOS:
-        if campo in colunas_disponiveis:
-            mapping[campo] = campo
-        else:
-            # Procurar alternativa por correspondência fuzzy
-            encontrado = False
-            for alt in MAPA_ALTERNATIVAS.get(campo, []):
-                alt_lower = alt.lower().strip()
-                if alt_lower in colunas_disponiveis:
-                    mapping[campo] = alt_lower
-                    df_work.rename(columns={alt_lower: campo}, inplace=True)
-                    encontrado = True
-                    break
-            
-            if not encontrado:
-                colunas_faltando.append(campo)
-    
-    # Tentar mapear campos opcionais
-    campos_opcionais_mapeados = {}
-    for campo in CAMPOS_OPCIONAIS:
-        if campo in colunas_disponiveis:
-            campos_opcionais_mapeados[campo] = campo
-        else:
-            for alt in MAPA_ALTERNATIVAS.get(campo, []):
-                alt_lower = alt.lower().strip()
-                if alt_lower in colunas_disponiveis:
-                    campos_opcionais_mapeados[campo] = alt_lower
-                    df_work.rename(columns={alt_lower: campo}, inplace=True)
-                    break
-    
-    # Retornar status
-    sucesso = len(colunas_faltando) == 0
-    return df_work, mapping, sucesso, colunas_faltando, campos_opcionais_mapeados
+    try:
+        # Inicializar adaptador
+        adapter = FieldAdapter(df)
+        
+        # Preparar informações para o UI
+        adapter_info = {
+            'adapter': adapter,
+            'campos_mapeados': adapter.available_fields,
+            'confianca': adapter.confidence_scores,
+            'analises_disponiveis': adapter.available_analyses,
+            'campos_obrigatorios_ok': all(f in adapter.available_fields for f in ['cliente', 'fornecedor', 'valor']),
+        }
+        
+        # Renomear colunas no dataframe com base no mapeamento
+        df_renamed = df.copy()
+        rename_map = {}
+        for field_name, col_original in adapter.field_mapping.items():
+            if col_original != field_name:  # Apenas renomear se for diferente
+                rename_map[col_original] = field_name
+        
+        if rename_map:
+            df_renamed.rename(columns=rename_map, inplace=True)
+        
+        # Limpeza robusta
+        for col in ['cliente', 'fornecedor']:
+            if col in df_renamed.columns:
+                df_renamed[col] = df_renamed[col].fillna('').astype(str).str.strip()
+                df_renamed.loc[df_renamed[col].isin(['', 'nan', 'None', 'Não Identificado']), col] = 'Não Identificado'
+        
+        # Converter valor para numérico
+        if 'valor' in df_renamed.columns:
+            df_renamed['valor'] = pd.to_numeric(df_renamed['valor'], errors='coerce').fillna(0)
+        
+        # Converter data se existir
+        if 'data' in df_renamed.columns:
+            df_renamed['data'] = pd.to_datetime(df_renamed['data'], errors='coerce')
+        
+        sucesso = adapter_info['campos_obrigatorios_ok']
+        return df_renamed, adapter_info, sucesso
+        
+    except Exception as e:
+        st.error(f"Erro ao adaptar arquivo: {str(e)}")
+        return df, {}, False
 
 def limpar_dados_entidade(df: pd.DataFrame, coluna: str) -> pd.Series:
     """Limpa e padroniza dados de entidades"""
@@ -267,30 +249,45 @@ def investigador_inteligente(df: pd.DataFrame):
         return
     
     # ========== VALIDAÇÃO E ADAPTAÇÃO DO ARQUIVO ==========
-    st.subheader("📋 Validação do Arquivo Fiscal")
+    st.subheader("📋 Análise de Estrutura do Arquivo")
     
-    df, mapping, sucesso, colunas_faltando, campos_opcionais = validar_e_adaptar_arquivo_fiscal(df)
+    df, adapter_info, sucesso = validar_e_adaptar_arquivo_fiscal(df)
+    adapter = adapter_info.get('adapter')
     
-    # Mostrar resultado da validação
-    col_val1, col_val2 = st.columns(2)
-    
-    with col_val1:
-        if sucesso:
-            st.success("✅ Arquivo validado com sucesso!")
-            st.caption(f"Colunas obrigatórias encontradas e mapeadas: {', '.join(list(mapping.keys()))}")
-        else:
-            st.error(f"❌ Erro na validação: Colunas obrigatórias faltando")
-            st.error(f"Campos não encontrados: {', '.join(colunas_faltando)}")
-            st.info("📋 O arquivo DEVE conter as colunas:\n- **cliente** (nome do comprador/declarante)\n- **fornecedor** (nome do vendedor/prestador)\n- **valor** (montante/base tributável)")
-            st.info("📌 Campos opcionais recomendados:\n- fatura (número de NF/fatura)\n- data (data da transação)\n- iva_liquidado (imposto liquidado)\n- iva_suportado (imposto suportado)\n- nif_cliente, nif_fornecedor")
-            return
-    
-    with col_val2:
-        if campos_opcionais:
-            opt_list = ", ".join(campos_opcionais.keys())
-            st.info(f"✨ Campos opcionais detectados: {opt_list}")
-        else:
-            st.caption("ℹ️ Sem campos opcionais. Algumas análises terão funcionalidade limitada.")
+    # Dashboard de campos detectados
+    if adapter:
+        col_status1, col_status2 = st.columns(2)
+        
+        with col_status1:
+            campos_detectados = adapter_info.get('campos_mapeados', {})
+            if campos_detectados:
+                st.success(f"✅ {len(campos_detectados)} campo(s) mapeado(s)")
+                for field, col in campos_detectados.items():
+                    confianca = adapter_info.get('confianca', {}).get(field, 0)
+                    st.caption(f"• **{field}** ← `{col}` ({confianca:.0f}% confiança)")
+            else:
+                st.warning("⚠️ Nenhum campo reconhecido")
+        
+        with col_status2:
+            analises_info = adapter_info.get('analises_disponiveis', {})
+            analises_ok = sum(1 for a in analises_info.values() if a.get('available', False))
+            total_analises = len(analises_info)
+            
+            st.info(f"📊 Análises Disponíveis: **{analises_ok}/{total_analises}**")
+            
+            # Mostrar quais análises estão disponíveis
+            with st.expander("Ver detalhes das análises", expanded=False):
+                for analysis_name, info in sorted(analises_info.items()):
+                    if info.get('available'):
+                        status = "✅"
+                        detalhe = "Completa"
+                        if info.get('optional_missing'):
+                            detalhe += f" (sem {', '.join(info['optional_missing'])})"
+                    else:
+                        status = "❌"
+                        detalhe = f"Falta: {', '.join(info.get('missing', []))}"
+                    
+                    st.caption(f"{status} **{analysis_name}**: {detalhe}")
     
     st.divider()
     
