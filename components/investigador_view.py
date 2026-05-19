@@ -376,12 +376,19 @@ def investigador_inteligente(df: pd.DataFrame):
     
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("💰 Volume Total", f"{df_filtrado['valor'].sum():,.0f} FCFA")
+        if 'valor' in df_filtrado.columns:
+            st.metric("💰 Volume Total", f"{df_filtrado['valor'].sum():,.0f} FCFA")
+        else:
+            st.metric("💰 Volume Total", "N/D")
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("📊 Ticket Médio", f"{df_filtrado['valor'].mean():,.0f} FCFA")
+        if 'valor' in df_filtrado.columns and not df_filtrado.empty:
+            ticket_medio = df_filtrado['valor'].mean()
+            st.metric("📊 Ticket Médio", f"{ticket_medio:,.0f} FCFA")
+        else:
+            st.metric("📊 Ticket Médio", "N/D")
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col3:
