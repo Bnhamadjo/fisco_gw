@@ -106,6 +106,6 @@ def normalize_columns(df):
             df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True)
             df[col] = df[col].str.replace(r'[\s,\.]', '', regex=True)
             # Garantir que se for 'nan' ou vazio fique limpo
-            df[col] = df[col].apply(lambda x: x if x.lower() != 'nan' else "")
+            df[col] = df[col].apply(lambda x: "" if isinstance(x, str) and x.lower() == 'nan' else x)
 
     return df
