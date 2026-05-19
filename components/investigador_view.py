@@ -636,7 +636,7 @@ def investigador_inteligente(df: pd.DataFrame):
         st.markdown("### ⏳ Inteligência Comportamental (Sinais de Lavagem)")
         st.info("Analisa a série histórica de cada contribuinte. Picos súbitos e massivos de faturamento (5x a média) que ignoram a sazonalidade normal podem ser indicativos de injeção de capital ilícito (Lavagem de Dinheiro).")
         
-        if st.button("Executar Scan Comportamental", width='stretch')::
+        if st.button("Executar Scan Comportamental", width='stretch'):
             with st.spinner("Analisando perfil temporal de todos os contribuintes..."):
                 from modules.fraud import detectar_lavagem_temporal
                 picos = detectar_lavagem_temporal(df_filtrado)
