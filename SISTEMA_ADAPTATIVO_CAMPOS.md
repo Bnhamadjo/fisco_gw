@@ -260,6 +260,6 @@ def _detect_fields(self):
 
 ---
 
-**Versão:** 1.0  
+**Versão:** 1.1  
 **Data:** 2026-05-19  
 **Status:** ✅ Em Produção
