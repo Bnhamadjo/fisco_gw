@@ -412,7 +412,8 @@ def investigador_inteligente(df: pd.DataFrame):
     tabs_disponiveis = []
     tab_icons = {}
     
-    if campo_disponivel(df_filtrado, 'cliente') or campo_disponivel(df_filtrado, 'fornecedor'):
+    # Entity view requer AMBAS as colunas
+    if campo_disponivel(df_filtrado, 'cliente') and campo_disponivel(df_filtrado, 'fornecedor'):
         tabs_disponiveis.append(("🎯 Visão por Entidade", "entity_view"))
         
     if campo_disponivel(df_filtrado, 'cliente') and campo_disponivel(df_filtrado, 'fornecedor') and campo_disponivel(df_filtrado, 'valor'):
@@ -456,82 +457,94 @@ def investigador_inteligente(df: pd.DataFrame):
         with tabs_dict["entity_view"]:
             st.subheader("🔍 Análise Detalhada por Entidade")
         
-        entidade = st.selectbox("Selecione uma entidade", all_entities, key="iso_ent")
-        
-        if entidade:
-            resumo = calcular_resumo_entidade(df_filtrado, entidade)
+        # Double-check columns exist before proceeding
+        if 'cliente' not in df_filtrado.columns or 'fornecedor' not in df_filtrado.columns:
+            st.error("❌ Colunas 'cliente' e 'fornecedor' não encontradas para análise por entidade.")
+        else:
+            entidade = st.selectbox("Selecione uma entidade", all_entities, key="iso_ent")
             
-            # Grid de métricas
-            col_a, col_b, col_c, col_d = st.columns(4)
-            with col_a:
-                st.metric("📤 Vendas", f"{resumo['total_vendas']:,.0f} FCFA")
-            with col_b:
-                st.metric("📥 Compras", f"{resumo['total_compras']:,.0f} FCFA")
-            with col_c:
-                delta_color = "normal" if resumo['saldo_liquido'] >= 0 else "inverse"
-                st.metric("💼 Saldo", f"{resumo['saldo_liquido']:,.0f} FCFA", delta_color=delta_color)
-            with col_d:
-                total_parceiros = resumo['parceiros_unicos_vendas'] + resumo['parceiros_unicos_compras']
-                st.metric("🤝 Parceiros", f"{total_parceiros}")
-            
-            # Transações da entidade
-            transacoes_entidade = df_filtrado[
-                (df_filtrado['cliente'].astype(str).str.strip() == entidade) | 
-                (df_filtrado['fornecedor'].astype(str).str.strip() == entidade)
-            ]
-            
-            st.subheader("📋 Histórico de Transações")
-            st.dataframe(transacoes_entidade, width='stretch')
+            if entidade:
+                resumo = calcular_resumo_entidade(df_filtrado, entidade)
+                
+                # Grid de métricas
+                col_a, col_b, col_c, col_d = st.columns(4)
+                with col_a:
+                    st.metric("📤 Vendas", f"{resumo['total_vendas']:,.0f} FCFA")
+                with col_b:
+                    st.metric("📥 Compras", f"{resumo['total_compras']:,.0f} FCFA")
+                with col_c:
+                    delta_color = "normal" if resumo['saldo_liquido'] >= 0 else "inverse"
+                    st.metric("💼 Saldo", f"{resumo['saldo_liquido']:,.0f} FCFA", delta_color=delta_color)
+                with col_d:
+                    total_parceiros = resumo['parceiros_unicos_vendas'] + resumo['parceiros_unicos_compras']
+                    st.metric("🤝 Parceiros", f"{total_parceiros}")
+                
+                # Transações da entidade - com verificação adicional
+                try:
+                    transacoes_entidade = df_filtrado[
+                        (df_filtrado['cliente'].astype(str).str.strip() == entidade) | 
+                        (df_filtrado['fornecedor'].astype(str).str.strip() == entidade)
+                    ]
+                    
+                    st.subheader("📋 Histórico de Transações")
+                    st.dataframe(transacoes_entidade, width='stretch')
+                except KeyError as e:
+                    st.error(f"❌ Erro ao processar transações: Coluna ausente - {str(e)}")
     
     # TAB: ANÁLISE DE FLUXOS
     if "flow_analysis" in tabs_dict:
         with tabs_dict["flow_analysis"]:
             st.subheader("📊 Matriz de Fluxos Comerciais")
             
-            if campo_disponivel(df_filtrado, 'cliente') and campo_disponivel(df_filtrado, 'fornecedor'):
-                # Criar matriz de fluxo
-                fluxo_matrix = df_filtrado.groupby(['cliente', 'fornecedor'])['valor'].sum().reset_index()
-                
-                if not fluxo_matrix.empty:
-                    # Top 10 relações
-                    top_10 = fluxo_matrix.nlargest(10, 'valor')
+            if campo_disponivel(df_filtrado, 'cliente') and campo_disponivel(df_filtrado, 'fornecedor') and campo_disponivel(df_filtrado, 'valor'):
+                try:
+                    # Criar matriz de fluxo
+                    fluxo_matrix = df_filtrado.groupby(['cliente', 'fornecedor'])['valor'].sum().reset_index()
                     
-                    fig = px.bar(top_10, x='cliente', y='valor', color='fornecedor',
-                                title="Top 10 Relações Comerciais",
-                                labels={'valor': 'Volume (FCFA)', 'cliente': 'Cliente'},
-                                text_auto='.2s')
-                    fig.update_layout(showlegend=True, height=500)
-                    st.plotly_chart(fig, width='stretch')
-                    
-                    # Heatmap das principais relações
-                    st.subheader("🗺️ Mapa de Calor de Transações")
-                    st.caption("Visualiza a densidade financeira entre os maiores clientes e fornecedores. As cores mais intensas indicam concentrações de volume que podem merecer investigação por dependência económica.")
-                    
-                    # Selecionar top N entidades para visualização
-                    top_n = st.slider("Número de entidades para visualizar", 5, min(20, len(all_entities)), 10)
-                
-                # Pegar top N entidades por volume
-                top_clientes = fluxo_matrix.groupby('cliente')['valor'].sum().nlargest(top_n).index.tolist()
-                top_fornecedores = fluxo_matrix.groupby('fornecedor')['valor'].sum().nlargest(top_n).index.tolist()
-                
-                fluxo_filtrado = fluxo_matrix[
-                    fluxo_matrix['cliente'].isin(top_clientes) & 
-                    fluxo_matrix['fornecedor'].isin(top_fornecedores)
-                ]
-                
-                if not fluxo_filtrado.empty:
-                    pivot = fluxo_filtrado.pivot_table(index='cliente', columns='fornecedor', 
-                                                      values='valor', fill_value=0)
-                    
-                    fig_heat = px.imshow(pivot, 
-                                        title=f"Matriz de Transações (Top {top_n} Entidades)",
-                                        labels=dict(x="Fornecedor", y="Cliente", color="Valor (FCFA)"),
-                                        aspect="auto",
-                                        color_continuous_scale="Viridis")
-                    fig_heat.update_layout(height=600)
-                    st.plotly_chart(fig_heat, width='stretch')
+                    if not fluxo_matrix.empty:
+                        # Top 10 relações
+                        top_10 = fluxo_matrix.nlargest(10, 'valor')
+                        
+                        fig = px.bar(top_10, x='cliente', y='valor', color='fornecedor',
+                                    title="Top 10 Relações Comerciais",
+                                    labels={'valor': 'Volume (FCFA)', 'cliente': 'Cliente'},
+                                    text_auto='.2s')
+                        fig.update_layout(showlegend=True, height=500)
+                        st.plotly_chart(fig, width='stretch')
+                        
+                        # Heatmap das principais relações
+                        st.subheader("🗺️ Mapa de Calor de Transações")
+                        st.caption("Visualiza a densidade financeira entre os maiores clientes e fornecedores. As cores mais intensas indicam concentrações de volume que podem merecer investigação por dependência económica.")
+                        
+                        # Selecionar top N entidades para visualização
+                        top_n = st.slider("Número de entidades para visualizar", 5, min(20, len(all_entities)), 10)
+                        
+                        # Pegar top N entidades por volume
+                        top_clientes = fluxo_matrix.groupby('cliente')['valor'].sum().nlargest(top_n).index.tolist()
+                        top_fornecedores = fluxo_matrix.groupby('fornecedor')['valor'].sum().nlargest(top_n).index.tolist()
+                        
+                        fluxo_filtrado = fluxo_matrix[
+                            fluxo_matrix['cliente'].isin(top_clientes) & 
+                            fluxo_matrix['fornecedor'].isin(top_fornecedores)
+                        ]
+                        
+                        if not fluxo_filtrado.empty:
+                            pivot = fluxo_filtrado.pivot_table(index='cliente', columns='fornecedor', 
+                                                              values='valor', fill_value=0)
+                            
+                            fig_heat = px.imshow(pivot, 
+                                                title=f"Matriz de Transações (Top {top_n} Entidades)",
+                                                labels=dict(x="Fornecedor", y="Cliente", color="Valor (FCFA)"),
+                                                aspect="auto",
+                                                color_continuous_scale="Viridis")
+                            fig_heat.update_layout(height=600)
+                            st.plotly_chart(fig_heat, width='stretch')
+                    else:
+                        st.info("Nenhum dado de fluxo disponível para análise.")
+                except KeyError as e:
+                    st.error(f"❌ Erro ao processar análise de fluxos: {str(e)}")
             else:
-                st.info("Nenhum dado de fluxo disponível")
+                st.info("Colunas necessárias (cliente, fornecedor, valor) não disponíveis para análise de fluxos.")
     
     # TAB: CRUZAMENTO FISCAL
     if "cross_audit" in tabs_dict:
@@ -539,37 +552,44 @@ def investigador_inteligente(df: pd.DataFrame):
             st.subheader("⚖️ Auditoria Fiscal Detalhada")
             st.caption("Analisa o equilíbrio entre Vendas e Compras de uma única entidade. O sistema calcula a margem presumida e estima o IVA devido com base na diferença declarada.")
             
-            entidade_audit = st.selectbox("Entidade para Auditoria", all_entities, key="cross_ent")
-            
-            if entidade_audit:
-                vendas = df_filtrado[df_filtrado['fornecedor'].astype(str).str.strip() == entidade_audit]
-                compras = df_filtrado[df_filtrado['cliente'].astype(str).str.strip() == entidade_audit]
+            # Verificar se colunas necessárias existem
+            if 'fornecedor' not in df_filtrado.columns or 'cliente' not in df_filtrado.columns or 'valor' not in df_filtrado.columns:
+                st.error("❌ Colunas necessárias (cliente, fornecedor, valor) não encontradas.")
+            else:
+                entidade_audit = st.selectbox("Entidade para Auditoria", all_entities, key="cross_ent")
                 
-                # Métricas fiscais
-                col_v1, col_v2, col_v3 = st.columns(3)
-                
-                with col_v1:
-                    st.markdown("### 📤 Vendas Declaradas")
-                st.metric("Total", f"{vendas['valor'].sum():,.0f} FCFA")
-                st.metric("N° Transações", len(vendas))
-                if 'cliente' in vendas.columns:
-                    st.metric("Clientes Únicos", vendas['cliente'].nunique())
-            
-            with col_v2:
-                st.markdown("### 📥 Compras Declaradas")
-                st.metric("Total", f"{compras['valor'].sum():,.0f} FCFA")
-                st.metric("N° Transações", len(compras))
-                if 'fornecedor' in compras.columns:
-                    st.metric("Fornecedores Únicos", compras['fornecedor'].nunique())
-            
-            with col_v3:
-                st.markdown("### ⚖️ Resultado Fiscal")
-                resultado = vendas['valor'].sum() - compras['valor'].sum()
-                st.metric("Base de Cálculo", f"{resultado:,.0f} FCFA")
-                
-                # Simulação de imposto (18%)
-                iva_estimado = resultado * 0.18
-                st.metric("IVA Estimado (18%)", f"{iva_estimado:,.0f} FCFA")
+                if entidade_audit:
+                    try:
+                        vendas = df_filtrado[df_filtrado['fornecedor'].astype(str).str.strip() == entidade_audit]
+                        compras = df_filtrado[df_filtrado['cliente'].astype(str).str.strip() == entidade_audit]
+                        
+                        # Métricas fiscais
+                        col_v1, col_v2, col_v3 = st.columns(3)
+                        
+                        with col_v1:
+                            st.markdown("### 📤 Vendas Declaradas")
+                            st.metric("Total", f"{vendas['valor'].sum():,.0f} FCFA")
+                            st.metric("N° Transações", len(vendas))
+                            if 'cliente' in vendas.columns:
+                                st.metric("Clientes Únicos", vendas['cliente'].nunique())
+                        
+                        with col_v2:
+                            st.markdown("### 📥 Compras Declaradas")
+                            st.metric("Total", f"{compras['valor'].sum():,.0f} FCFA")
+                            st.metric("N° Transações", len(compras))
+                            if 'fornecedor' in compras.columns:
+                                st.metric("Fornecedores Únicos", compras['fornecedor'].nunique())
+                        
+                        with col_v3:
+                            st.markdown("### ⚖️ Resultado Fiscal")
+                            resultado = vendas['valor'].sum() - compras['valor'].sum()
+                            st.metric("Base de Cálculo", f"{resultado:,.0f} FCFA")
+                            
+                            # Simulação de imposto (18%)
+                            iva_estimado = resultado * 0.18
+                            st.metric("IVA Estimado (18%)", f"{iva_estimado:,.0f} FCFA")
+                    except KeyError as e:
+                        st.error(f"❌ Erro ao processar auditoria fiscal: {str(e)}")
     
     # TAB: AUDITORIA BILATERAL
     if "bilateral_audit" in tabs_dict:
@@ -577,7 +597,10 @@ def investigador_inteligente(df: pd.DataFrame):
             st.subheader("🤝 Análise Bilateral de Transações")
             st.caption("Cruza diretamente os registos entre dois contribuintes. O objetivo é validar se o que um declarou como compra é exatamente o que o outro declarou como venda, detetando omissões unilaterais.")
             
-            if len(all_entities) >= 2:
+            # Verificar se colunas necessárias existem
+            if 'cliente' not in df_filtrado.columns or 'fornecedor' not in df_filtrado.columns or 'valor' not in df_filtrado.columns:
+                st.error("❌ Colunas necessárias (cliente, fornecedor, valor) não encontradas para análise bilateral.")
+            elif len(all_entities) >= 2:
                 col_a, col_b = st.columns(2)
                 with col_a:
                     ent_a = st.selectbox("Entidade A", all_entities, key="bil_a")
@@ -585,77 +608,80 @@ def investigador_inteligente(df: pd.DataFrame):
                     ent_b = st.selectbox("Entidade B", all_entities, key="bil_b")
                 
                 if ent_a != ent_b:
-                    # Transações nos dois sentidos
-                    a_para_b = df_filtrado[
-                        (df_filtrado['cliente'].astype(str).str.strip() == ent_a) & 
-                        (df_filtrado['fornecedor'].astype(str).str.strip() == ent_b)
-                    ]
-                    b_para_a = df_filtrado[
-                        (df_filtrado['cliente'].astype(str).str.strip() == ent_b) & 
-                        (df_filtrado['fornecedor'].astype(str).str.strip() == ent_a)
-                    ]
-                    
-                    col_res1, col_res2 = st.columns(2)
-                    with col_res1:
-                        st.metric(f"{ent_a} → {ent_b}", f"{a_para_b['valor'].sum():,.0f} FCFA")
-                        st.caption(f"{len(a_para_b)} transações")
-                    
-                    with col_res2:
-                        st.metric(f"{ent_b} → {ent_a}", f"{b_para_a['valor'].sum():,.0f} FCFA")
-                        st.caption(f"{len(b_para_a)} transações")
-                    
-                    # Transações combinadas
-                    todas_transacoes = pd.concat([a_para_b, b_para_a]).copy()
-                    
-                    if not todas_transacoes.empty:
-                        st.subheader("📋 Detalhamento das Transações")
+                    try:
+                        # Transações nos dois sentidos
+                        a_para_b = df_filtrado[
+                            (df_filtrado['cliente'].astype(str).str.strip() == ent_a) & 
+                            (df_filtrado['fornecedor'].astype(str).str.strip() == ent_b)
+                        ]
+                        b_para_a = df_filtrado[
+                            (df_filtrado['cliente'].astype(str).str.strip() == ent_b) & 
+                            (df_filtrado['fornecedor'].astype(str).str.strip() == ent_a)
+                        ]
                         
-                        # CÁLCULO DE IMPOSTO REAL VS DECLARADO
-                        tax_rate = 0.18
-                        col_taxa = "taxa_aplicada" if "taxa_aplicada" in todas_transacoes.columns else None
+                        col_res1, col_res2 = st.columns(2)
+                        with col_res1:
+                            st.metric(f"{ent_a} → {ent_b}", f"{a_para_b['valor'].sum():,.0f} FCFA")
+                            st.caption(f"{len(a_para_b)} transações")
                         
-                        # Busca flexível por colunas de IVA
-                        iva_liq_cols = [c for c in todas_transacoes.columns if c.startswith("iva_liquidado")]
-                        iva_sup_cols = [c for c in todas_transacoes.columns if c.startswith("iva_suportado")]
-                        col_iva = iva_liq_cols[0] if iva_liq_cols else (iva_sup_cols[0] if iva_sup_cols else None)
+                        with col_res2:
+                            st.metric(f"{ent_b} → {ent_a}", f"{b_para_a['valor'].sum():,.0f} FCFA")
+                            st.caption(f"{len(b_para_a)} transações")
                         
-                        if 'valor' in todas_transacoes.columns:
-                            todas_transacoes['Imposto Real (Calculado)'] = todas_transacoes['valor'] * (todas_transacoes[col_taxa] if col_taxa else tax_rate)
+                        # Transações combinadas
+                        todas_transacoes = pd.concat([a_para_b, b_para_a]).copy()
+                        
+                        if not todas_transacoes.empty:
+                            st.subheader("📋 Detalhamento das Transações")
                             
-                            if col_iva:
-                                todas_transacoes['Imposto Declarado'] = todas_transacoes[col_iva].fillna(0)
-                                todas_transacoes['Diferença (Risco)'] = todas_transacoes['Imposto Declarado'] - todas_transacoes['Imposto Real (Calculado)']
+                            # CÁLCULO DE IMPOSTO REAL VS DECLARADO
+                            tax_rate = 0.18
+                            col_taxa = "taxa_aplicada" if "taxa_aplicada" in todas_transacoes.columns else None
+                            
+                            # Busca flexível por colunas de IVA
+                            iva_liq_cols = [c for c in todas_transacoes.columns if c.startswith("iva_liquidado")]
+                            iva_sup_cols = [c for c in todas_transacoes.columns if c.startswith("iva_suportado")]
+                            col_iva = iva_liq_cols[0] if iva_liq_cols else (iva_sup_cols[0] if iva_sup_cols else None)
+                            
+                            if 'valor' in todas_transacoes.columns:
+                                todas_transacoes['Imposto Real (Calculado)'] = todas_transacoes['valor'] * (todas_transacoes[col_taxa] if col_taxa else tax_rate)
                                 
-                                # Resumo Financeiro Bilateral
-                                total_real = todas_transacoes['Imposto Real (Calculado)'].sum()
-                                total_decl = todas_transacoes['Imposto Declarado'].sum()
-                                desvio = total_decl - total_real
-                                
-                                st.markdown(f"""
-                                | Descrição | Valor |
-                                | :--- | :--- |
-                                | **Total Transacionado** | {todas_transacoes['valor'].sum():,.2f} FCFA |
-                                | **Imposto Real Esperado** | {total_real:,.2f} FCFA |
-                                | **Imposto Efetivamente Declarado** | {total_decl:,.2f} FCFA |
-                                | **Diferença / Desvio Fiscal** | <span style='color:{"red" if abs(desvio) > 10 else "green"}'>{desvio:,.2f} FCFA</span> |
-                                """, unsafe_allow_html=True)
-                                
-                                # EXPOSIÇÃO DE EVIDÊNCIAS
-                                st.write("#### 🚩 Evidências de Incongruência entre as Partes")
-                                evidencias = todas_transacoes[abs(todas_transacoes['Diferença (Risco)']) > 1].copy()
-                                
-                                if not evidencias.empty:
-                                    st.warning(f"Foram encontradas **{len(evidencias)}** faturas com divergência entre {ent_a} e {ent_b}.")
-                                    cols_ev = ['fatura', 'data', 'valor', 'Imposto Declarado', 'Imposto Real (Calculado)', 'Diferença (Risco)']
-                                    cols_ev_exists = [c for c in cols_ev if c in evidencias.columns]
-                                    st.dataframe(evidencias[cols_ev_exists].sort_values(by='Diferença (Risco)', ascending=False), width='stretch')
-                                else:
-                                    st.success("✅ Nenhuma discrepância fiscal detectada nas transações mutuais.")
-                        
-                        st.write("#### Todas as Transações do Par")
-                        st.dataframe(todas_transacoes, width='stretch')
-                    else:
-                        st.info(f"📭 Nenhuma transação direta entre {ent_a} e {ent_b}")
+                                if col_iva:
+                                    todas_transacoes['Imposto Declarado'] = todas_transacoes[col_iva].fillna(0)
+                                    todas_transacoes['Diferença (Risco)'] = todas_transacoes['Imposto Declarado'] - todas_transacoes['Imposto Real (Calculado)']
+                                    
+                                    # Resumo Financeiro Bilateral
+                                    total_real = todas_transacoes['Imposto Real (Calculado)'].sum()
+                                    total_decl = todas_transacoes['Imposto Declarado'].sum()
+                                    desvio = total_decl - total_real
+                                    
+                                    st.markdown(f"""
+                                    | Descrição | Valor |
+                                    | :--- | :--- |
+                                    | **Total Transacionado** | {todas_transacoes['valor'].sum():,.2f} FCFA |
+                                    | **Imposto Real Esperado** | {total_real:,.2f} FCFA |
+                                    | **Imposto Efetivamente Declarado** | {total_decl:,.2f} FCFA |
+                                    | **Diferença / Desvio Fiscal** | <span style='color:{"red" if abs(desvio) > 10 else "green"}'>{desvio:,.2f} FCFA</span> |
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # EXPOSIÇÃO DE EVIDÊNCIAS
+                                    st.write("#### 🚩 Evidências de Incongruência entre as Partes")
+                                    evidencias = todas_transacoes[abs(todas_transacoes['Diferença (Risco)']) > 1].copy()
+                                    
+                                    if not evidencias.empty:
+                                        st.warning(f"Foram encontradas **{len(evidencias)}** faturas com divergência entre {ent_a} e {ent_b}.")
+                                        cols_ev = ['fatura', 'data', 'valor', 'Imposto Declarado', 'Imposto Real (Calculado)', 'Diferença (Risco)']
+                                        cols_ev_exists = [c for c in cols_ev if c in evidencias.columns]
+                                        st.dataframe(evidencias[cols_ev_exists].sort_values(by='Diferença (Risco)', ascending=False), width='stretch')
+                                    else:
+                                        st.success("✅ Nenhuma discrepância fiscal detectada nas transações mutuais.")
+                            
+                            st.write("#### Todas as Transações do Par")
+                            st.dataframe(todas_transacoes, width='stretch')
+                        else:
+                            st.info(f"📭 Nenhuma transação direta entre {ent_a} e {ent_b}")
+                    except KeyError as e:
+                        st.error(f"❌ Erro ao processar análise bilateral: {str(e)}")
                 else:
                     st.warning("⚠️ Selecione entidades diferentes para análise bilateral")
             else:
@@ -706,37 +732,41 @@ def investigador_inteligente(df: pd.DataFrame):
             st.subheader("📈 Análise de Tendências Temporais")
             st.caption("Estuda a evolução do faturamento ao longo do tempo. Picos súbitos ou quedas drásticas em meses específicos podem indicar sazonalidade legítima ou tentativas de ajuste fiscal de última hora.")
             
-            if campo_disponivel(df_filtrado, 'data'):
-                # Preparar dados temporais
-                df_temporal = df_filtrado.copy()
-                df_temporal['data'] = pd.to_datetime(df_temporal['data'], errors='coerce')
-                if df_temporal['data'].dt.tz is not None:
-                    df_temporal['data'] = df_temporal['data'].dt.tz_localize(None)
-                df_temporal = df_temporal.dropna(subset=['data'])
-                
-                if not df_temporal.empty:
-                    df_temporal['mês'] = df_temporal['data'].dt.to_period('M').astype(str)
+            if campo_disponivel(df_filtrado, 'data') and campo_disponivel(df_filtrado, 'valor'):
+                try:
+                    # Preparar dados temporais
+                    df_temporal = df_filtrado.copy()
+                    df_temporal['data'] = pd.to_datetime(df_temporal['data'], errors='coerce')
+                    if df_temporal['data'].dt.tz is not None:
+                        df_temporal['data'] = df_temporal['data'].dt.tz_localize(None)
+                    df_temporal = df_temporal.dropna(subset=['data'])
                     
-                    # Agregação mensal
-                    mensal = df_temporal.groupby('mês')['valor'].agg(['sum', 'count', 'mean']).reset_index()
-                    mensal.columns = ['Período', 'Volume Total', 'N° Transações', 'Ticket Médio']
-                    
-                    # Gráfico de evolução
-                    fig_line = px.line(mensal, x='Período', y='Volume Total',
-                                      title="Evolução do Volume de Transações",
-                                      markers=True)
-                    fig_line.update_layout(height=400)
-                    st.plotly_chart(fig_line, width='stretch')
-                    
-                    # Sazonalidade
-                    df_temporal['mês_num'] = df_temporal['data'].dt.month
-                    sazonal = df_temporal.groupby('mês_num')['valor'].mean().reset_index()
-                    
-                    fig_sazonal = px.bar(sazonal, x='mês_num', y='valor',
-                                        title="Média por Mês (Sazonalidade)",
-                                        labels={'mês_num': 'Mês', 'valor': 'Média (FCFA)'})
-                    st.plotly_chart(fig_sazonal, width='stretch')
-                else:
+                    if not df_temporal.empty:
+                        df_temporal['mês'] = df_temporal['data'].dt.to_period('M').astype(str)
+                        
+                        # Agregação mensal
+                        mensal = df_temporal.groupby('mês')['valor'].agg(['sum', 'count', 'mean']).reset_index()
+                        mensal.columns = ['Período', 'Volume Total', 'N° Transações', 'Ticket Médio']
+                        
+                        # Gráfico de evolução
+                        fig_line = px.line(mensal, x='Período', y='Volume Total',
+                                          title="Evolução do Volume de Transações",
+                                          markers=True)
+                        fig_line.update_layout(height=400)
+                        st.plotly_chart(fig_line, width='stretch')
+                        
+                        # Sazonalidade
+                        df_temporal['mês_num'] = df_temporal['data'].dt.month
+                        sazonal = df_temporal.groupby('mês_num')['valor'].mean().reset_index()
+                        
+                        fig_sazonal = px.bar(sazonal, x='mês_num', y='valor',
+                                            title="Média por Mês (Sazonalidade)",
+                                            labels={'mês_num': 'Mês', 'valor': 'Média (FCFA)'})
+                        st.plotly_chart(fig_sazonal, width='stretch')
+                    else:
+                        st.info("Dados de data inválidos ou insuficientes")
+                except KeyError as e:
+                    st.error(f"❌ Erro ao processar análise temporal: {str(e)}")
                     st.info("Dados de data inválidos ou insuficientes")
             else:
                 st.info("💡 Para análise de tendências, adicione uma coluna 'data' ao seu arquivo")
